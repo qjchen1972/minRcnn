@@ -158,8 +158,7 @@ class Trainer:
                                              init_method='env://',
                                              world_size=world_size, 
                                              rank=rank)
-        torch.distributed.barrier()
-        
+        torch.distributed.barrier()        
         return local_rank, rank, world_size
         
     
@@ -209,7 +208,7 @@ class Trainer:
                                 num_workers=config.num_workers)
             '''
             loader = DataLoader(data, pin_memory=True,
-                                collate_fn = self.collate_fn,
+                                collate_fn = self.collate_fn, #lambda x: tuple(zip(*x))
                                 batch_size=config.batch_size,
                                 num_workers=config.num_workers,
                                 sampler=sampler)

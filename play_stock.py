@@ -36,24 +36,13 @@ def showimg(image, color, target=None, classes=None):
 
     for i, b in enumerate(target["boxes"]):
         b = b.cpu().long().numpy()
-        print(i,b)
         if 'scores' in target:
             txt = "{} {:.3f}".format(classes[target["labels"][i].item()], target["scores"][i].item())
         else:
             txt = "{}".format(classes[target["labels"][i].item()])
-        print(txt)
-        
-        print(b[0], b[1])        
         image = cv2.rectangle(image,(b[0], b[1]), (b[2], b[3]), (color, color, color), 2)
-        image = cv2.putText(image, txt, (b[0], b[1]), cv2.FONT_HERSHEY_COMPLEX, 1., (color, color, color), 2)
-        
-        '''
-        t = target["masks"]
-        p = t[torch.where(t>0)]
-        #print(target["masks"], p.shape, p)
-        '''        
+        image = cv2.putText(image, txt, (b[0], b[1]), cv2.FONT_HERSHEY_COMPLEX, 1., (color, color, color), 2)        
         point = mask2point(target["masks"][i])
-        print(point)
         if point is not None:
             cv2.polylines(image, [point], isClosed=True, color=(color, color, color), thickness=2)
 
@@ -98,18 +87,8 @@ def img2data(img_path, label_path):
                 mask = np.zeros(img.size)
                 
                 points = np.trunc(points).astype(int)
-                #mask[points[0][0]:points[1][0], points[0][1]:points[1][1]] = 1
                 cv2.drawContours(mask, [np.trunc(points).astype(int)], 0, (1,1,1), cv2.FILLED)
-                #masks.append(torch.from_numpy(mask[None]))
                 masks.append(mask)
-                '''
-                mask = mask[None]
-                if masks.shape[0] == 0:
-                    masks = mask
-                else:
-                    masks = np.concatenate((masks ,mask),axis=0)
-                '''
-                
                 boxes.append([np.min(points[:,0]), np.min(points[:,1]), np.max(points[:,0]), np.max(points[:,1])])
                 labels.append(0)  
                 
@@ -118,25 +97,13 @@ def img2data(img_path, label_path):
         boxes.append([0, 0, 0, 0])
         labels.append(0)
         mask = np.zeros(img.size)        
-        #masks.append(torch.from_numpy(mask[None]))
-        '''
-        mask = np.zeros(img.size)[None]
-        masks = mask
-        '''        
         masks.append(mask)
         
-    #masks = torch.stack(masks, dim=0) #
-    masks = torch.tensor(np.array(masks), dtype=torch.float32) #torch.cat(masks, dim=0)
-    #print(masks.shape, masks.dtype)
-    
+    masks = torch.tensor(np.array(masks), dtype=torch.float32)
     boxes = torch.tensor(boxes, dtype=torch.float32)
-    #print(boxes.shape, boxes)
-    
     labels = torch.tensor(labels)
-    #print(labels.shape, labels.dtype)
-    #exit()
     
-    return img, dict(boxes=boxes, labels=labels, masks=masks) #torch.from_numpy(masks))
+    return img, dict(boxes=boxes, labels=labels, masks=masks) 
         
 
 
@@ -161,18 +128,14 @@ class StockDataset(Dataset):
         
         imgName = self.imgList[idx]
         basename = os.path.basename(imgName)        
-        #dirs = imgName.split("\\")
         label = self.path + '/label/' + basename[:-3] + 'json'
         img, target= img2data(imgName, label)
-        #print(imgName, label)
         return img, target
         
     def get_imgName(self, idx):
         imgName = self.imgList[idx]
         basename = os.path.basename(imgName)
         return basename        
-        #dirs = imgName.split("/")
-        #return dirs[-1]
         
     
 train_dir = 'e:/data'
@@ -220,38 +183,10 @@ model = model.to(device)
 model.eval()
 BBOX_LABEL_NAMES = ('bg', 'TB',)
 
-'''
-{
-  "version": "4.5.6",
-  "flags": {},
-  "shapes": [
-    {
-      "label": "1",
-      "points": [
-        [
-          205.68783068783068,
-          215.34391534391534
-        ],
-        [
-          419.44444444444446,
-          486.2433862433862
-        ]
-      ],
-      "group_id": null,
-      "shape_type": "rectangle",
-      "flags": {}
-    }
-  ],
-  "imagePath": "000002_20001106.jpg",
-  "imageData": null 
-  "imageHeight": 512,
-  "imageWidth": 512
-}
-'''
 from copy import deepcopy
 
 
-
+#写图像label
 def createPostive(dataset):
 
     tb_path = '../tb'
@@ -302,6 +237,7 @@ def createPostive(dataset):
         if temp[:6] !=  imgName[:6]: continue
         shutil.copyfile(test_dataset.imgList[ans_index], os.path.join(tb_path, ansName))
     print('total time is %d' % (time.time() - start) )  
+
 
 def labelme(dataset):
 
@@ -402,38 +338,9 @@ def labelImg(dataset):
             f.write(json_str)        
     print('total time is %d' % (time.time() - start) )  
 
-
-'''
-m = [[img, target] for index, (img, target) in enumerate(test_dataset) if index <= 2]
-#print(m)
-print(m[0][0].shape)
-print(m[1][0].shape)
-
-with torch.no_grad():
-    result = model([m[0][0].to(device), m[1][0].to(device)])
-print(result)
-
-image = m[0][0].numpy()
-image = image.transpose((1, 2, 0))
-image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-showimg(image, 116, result[0], BBOX_LABEL_NAMES)
-cv2.imshow('ok', image)
-cv2.waitKey(0)
-
-image = m[1][0].numpy()
-image = image.transpose((1, 2, 0))
-image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-showimg(image, 116, result[0], BBOX_LABEL_NAMES)
-cv2.imshow('ok', image)
-cv2.waitKey(0)
-
-exit()
-'''
-
 from torch.utils.data.dataloader import DataLoader
 
 def showAnswer(dataset):
-
 
     loader = DataLoader(dataset, shuffle=True, collate_fn=lambda x: tuple(zip(*x)),  batch_size=4)
  
@@ -452,69 +359,9 @@ def showAnswer(dataset):
             showimg(image, 116, result, BBOX_LABEL_NAMES)
             cv2.imshow('ok', image)
             cv2.waitKey(0)
+            
 #labelme(test_dataset)    
 #labelImg(test_dataset)
 #createPostive(test_dataset)
 showAnswer(train_dataset)    
-exit()
-    
 
-tp_path = '/home/data/tp'
-fp_path = '/home/data/fp'
-
-right_box = 0
-total_box = 0
-nontb = 0
-tb = 0
-fp = 0
-fn = 0
-
-#python -m torch.distributed.launch --nproc_per_node=1  --nnodes=1 --node_rank=0 play_stock.py 
-#python -m torch.distributed.run --nproc_per_node=1  --nnodes=1 --node_rank=0 play_stock.py
-for index, (img, target) in enumerate(test_dataset):
-    
-    with torch.no_grad():
-        result = model([img.to(device)])
-    
-    image = img.numpy() * 255
-    image = image.transpose((1, 2, 0))
-    image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-    showimg(image, 0, result, BBOX_LABEL_NAMES)
-    cv2.imshow('ok', image)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-    
-    print(index)
-    target['labels'] += 1
-    
-    if target['boxes'].shape[0] == 1 and target['boxes'].sum(dim=1) < 1e-7:
-        nontb += 1
-        if result[0]['boxes'].shape[0] > 0:
-            fp += 1
-            total_box += result[0]['boxes'].shape[0]
-            showimg(image, 0, result[0], BBOX_LABEL_NAMES)
-            #cv2.imwrite(os.path.join(fp_path, "{}.png".format(index)), image)
-            cv2.imwrite(os.path.join(fp_path, test_dataset.get_imgName(index)), image)
-        continue
-        
-    tb += 1
-    if result[0]['boxes'].shape[0] == 0:
-        fn += 1
-        continue
-        
-    value, idx = box_iou(result[0]['boxes'], target['boxes'].to(result[0]['boxes'])).max(dim=1)
-    gt_idx = []
-    for i in range(result[0]['boxes'].shape[0]):
-        if value[i] < 0.1: 
-            gt_idx.append(-1)
-        else:
-            gt_idx.append(target['labels'][idx[i]].item())
-            
-    right_box += (np.array(gt_idx) == result[0]['labels'].cpu().numpy()).sum()
-    total_box += len(gt_idx)
-    showimg(image, 0, result[0], BBOX_LABEL_NAMES)
-    showimg(image, 200, target, BBOX_LABEL_NAMES)
-    cv2.imwrite(os.path.join(tp_path, test_dataset.get_imgName(index)), image)
-    
-print( total_box, right_box)
-print(nontb, fp, tb, fn)
